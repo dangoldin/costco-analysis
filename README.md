@@ -16,7 +16,11 @@ This project contains scripts to fetch and analyze Costco receipt data using the
    cp .env.example .env
    ```
 
-   Then edit `.env` and replace `your_bearer_token_here` with your actual Costco API bearer token.
+   Then edit `.env` and add your actual Costco API credentials. You can get these by looking at the network requests in your browser when you're logged in to costco.com and looking at the headers in the graphql requests.
+
+   - `COSTCO_BEARER_TOKEN` - Your bearer token
+   - `COSTCO_CLIENT_ID` - Your client ID
+   - `COSTCO_CLIENT_IDENTIFIER` - Your client identifier
 
 ## Scripts
 
@@ -26,11 +30,13 @@ This project contains scripts to fetch and analyze Costco receipt data using the
 
 ## Environment Variables
 
-- `COSTCO_BEARER_TOKEN` - Your Costco API bearer token (required)
+- `COSTCO_BEARER_TOKEN` - Your Costco API bearer token
+- `COSTCO_CLIENT_ID` - Your Costco API client ID
+- `COSTCO_CLIENT_IDENTIFIER` - Your Costco API client identifier
 
 ## Usage
 
-All scripts will automatically load the bearer token from your `.env` file. Make sure to set up the environment variables before running any scripts.
+All scripts will automatically load the required credentials from your `.env` file. Make sure to set up all the environment variables before running any scripts.
 
 ```bash
 python fetch_receipt_list.py
