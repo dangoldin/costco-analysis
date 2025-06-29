@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Costco Items Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: #f8f9fa;
+        min-height: 100vh;
+        color: #333;
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        grid-template-rows: auto 1fr auto;
+        min-height: 100vh;
+        gap: 24px;
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .header {
+        grid-column: 1 / -1;
+        background: white;
+        padding: 32px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e1e5e9;
+      }
+
+      .header h1 {
+        color: #1a1a1a;
+        font-size: 2rem;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .header p {
+        color: #6c757d;
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      .sidebar {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e1e5e9;
+        overflow-y: auto;
+        max-height: calc(100vh - 140px);
+      }
+
+      .main-content {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .chart-container {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e1e5e9;
+        height: 500px;
+      }
+
+      .table-container {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e1e5e9;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .item-selector {
+        margin-bottom: 24px;
+      }
+
+      .item-selector label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #1a1a1a;
+        font-size: 14px;
+      }
+
+      .multi-select {
+        width: 100%;
+        min-height: 300px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 8px;
+        font-size: 13px;
+        background: white;
+        font-family: inherit;
+      }
+
+      .multi-select option {
+        padding: 6px 8px;
+        cursor: pointer;
+        border-radius: 4px;
+        margin: 1px 0;
+      }
+
+      .multi-select option:hover {
+        background: #f3f4f6;
+      }
+
+      .multi-select option:checked {
+        background: #3b82f6;
+        color: white;
+      }
+
+      .stats-section {
+        margin-top: 24px;
+      }
+
+      .stats-section h3 {
+        color: #1a1a1a;
+        margin-bottom: 16px;
+        font-size: 16px;
+        font-weight: 500;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e1e5e9;
+      }
+
+      .stat-item {
+        background: #f8f9fa;
+        border: 1px solid #e1e5e9;
+        padding: 16px;
+        margin-bottom: 12px;
+        border-radius: 6px;
+      }
+
+      .stat-item h4 {
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #1a1a1a;
+        font-weight: 500;
+      }
+
+      .stat-value {
+        font-size: 13px;
+        color: #6c757d;
+        margin-bottom: 4px;
+      }
+
+      .price-change-item {
+        background: #f8f9fa;
+        border: 1px solid #e1e5e9;
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .price-change-item:hover {
+        background: #e9ecef;
+      }
+
+      .price-change-item.positive {
+        border-left: 4px solid #10b981;
+      }
+
+      .price-change-item.negative {
+        border-left: 4px solid #ef4444;
+      }
+
+      .price-change-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: #1a1a1a;
+        flex: 1;
+        margin-right: 12px;
+      }
+
+      .price-change-details {
+        text-align: right;
+        font-size: 12px;
+      }
+
+      .price-change-percent {
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .price-change-percent.positive {
+        color: #10b981;
+      }
+
+      .price-change-percent.negative {
+        color: #ef4444;
+      }
+
+      .price-change-prices {
+        color: #6c757d;
+        margin-top: 2px;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e1e5e9;
+      }
+
+      .data-table th {
+        background: #f8f9fa;
+        color: #1a1a1a;
+        font-weight: 500;
+        position: sticky;
+        top: 0;
+        border-bottom: 2px solid #e1e5e9;
+      }
+
+      .data-table tr:hover {
+        background: #f8f9fa;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #6c757d;
+      }
+
+      .controls-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .btn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: background-color 0.2s;
+      }
+
+      .btn:hover {
+        background: #2563eb;
+      }
+
+      .search-box {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: inherit;
+      }
+
+      .search-box:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      @media (max-width: 1024px) {
+        .container {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto 1fr auto;
+        }
+
+        .sidebar {
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Costco Items Analysis Dashboard</h1>
+        <p>
+          Interactive visualization of Costco purchase data with price trends
+          and statistics
+        </p>
+      </div>
+
+      <div class="sidebar">
+        <div class="item-selector">
+          <label for="itemSelect">Select Items (Multi-select):</label>
+          <select id="itemSelect" class="multi-select" multiple>
+            <option value="all" selected>All Items (Average)</option>
+          </select>
+        </div>
+
+        <div class="controls-row">
+          <button class="btn" onclick="selectAll()">Select All</button>
+          <button class="btn" onclick="clearSelection()">Clear All</button>
+        </div>
+
+        <div class="controls-row">
+          <input
+            type="text"
+            id="searchBox"
+            class="search-box"
+            placeholder="Search items..."
+            oninput="filterItems()"
+          />
+        </div>
+
+        <div class="stats-section">
+          <h3>Statistics</h3>
+          <div id="statsContainer">
+            <div class="loading">Select items to view statistics</div>
+          </div>
+        </div>
+
+        <div class="stats-section">
+          <h3>Largest Price Changes</h3>
+          <div id="priceChangesContainer">
+            <div class="loading">Loading price change analysis...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="main-content">
+        <div class="chart-container">
+          <div id="priceChart" style="width: 100%; height: 100%"></div>
+        </div>
+
+        <div class="table-container">
+          <h3 style="margin-bottom: 15px; color: #1a1a1a">Data Table</h3>
+          <table class="data-table" id="dataTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Item</th>
+                <th>Description</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr>
+                <td colspan="4" class="loading">Loading data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let rawData = [];
+      let chart = null;
+      let allItems = [];
+      let filteredItems = [];
+      let itemCounts = new Map();
+
+      // Initialize the application
+      async function initApp() {
+        try {
+          await loadData();
+          setupChart();
+          populateItemSelector();
+          updateVisualization();
+          updatePriceChanges();
+        } catch (error) {
+          console.error("Error initializing app:", error);
+          document.getElementById("tableBody").innerHTML =
+            '<tr><td colspan="4">Error loading data</td></tr>';
+        }
+      }
+
+      // Load CSV data
+      async function loadData() {
+        try {
+          const response = await fetch("costco-items.csv");
+          const csvText = await response.text();
+
+          const lines = csvText.trim().split("\n");
+          const headers = lines[0].split(",");
+
+          rawData = lines
+            .slice(1)
+            .map((line) => {
+              const values = parseCSVLine(line);
+              return {
+                transaction_date: values[0],
+                transaction_barcode: values[1],
+                item_number: values[2],
+                description: values[3],
+                description2: values[4],
+                combined_description: values[5],
+                item_unit_price: parseFloat(values[6]),
+              };
+            })
+            .filter(
+              (item) => !isNaN(item.item_unit_price) && item.item_unit_price > 0
+            );
+
+          // Count occurrences of each item
+          itemCounts.clear();
+          rawData.forEach((item) => {
+            const itemName =
+              item.combined_description || item.description || "Unknown Item";
+            itemCounts.set(itemName, (itemCounts.get(itemName) || 0) + 1);
+          });
+
+          // Get unique items sorted by count (descending)
+          allItems = Array.from(itemCounts.keys()).sort((a, b) => {
+            return itemCounts.get(b) - itemCounts.get(a);
+          });
+
+          filteredItems = [...allItems];
+
+          console.log(
+            `Loaded ${rawData.length} records with ${allItems.length} unique items`
+          );
+        } catch (error) {
+          console.error("Error loading data:", error);
+          throw error;
+        }
+      }
+
+      // Parse CSV line handling commas in quoted fields
+      function parseCSVLine(line) {
+        const result = [];
+        let current = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === "," && !inQuotes) {
+            result.push(current.trim());
+            current = "";
+          } else {
+            current += char;
+          }
+        }
+
+        result.push(current.trim());
+        return result;
+      }
+
+      // Setup ECharts
+      function setupChart() {
+        chart = echarts.init(document.getElementById("priceChart"));
+
+        const option = {
+          title: {
+            text: "Price Trends Over Time",
+            textStyle: {
+              fontSize: 18,
+              fontWeight: "500",
+              color: "#1a1a1a",
+            },
+          },
+          tooltip: {
+            trigger: "axis",
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+            borderColor: "#e1e5e9",
+            borderWidth: 1,
+            textStyle: {
+              color: "#333",
+            },
+            formatter: function (params) {
+              let tooltip = `<strong>${params[0].axisValue}</strong><br/>`;
+              params.forEach((param) => {
+                tooltip += `${param.marker} ${
+                  param.seriesName
+                }: $${param.value.toFixed(2)}<br/>`;
+              });
+              return tooltip;
+            },
+          },
+          legend: {
+            data: [],
+            top: 40,
+            textStyle: {
+              color: "#1a1a1a",
+            },
+          },
+          grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            top: "15%",
+            containLabel: true,
+          },
+          toolbox: {
+            feature: {
+              saveAsImage: {
+                title: "Save as Image",
+              },
+              dataZoom: {
+                title: {
+                  zoom: "Zoom",
+                  back: "Reset Zoom",
+                },
+              },
+            },
+          },
+          xAxis: {
+            type: "category",
+            boundaryGap: false,
+            data: [],
+            axisLabel: {
+              rotate: 45,
+              color: "#6c757d",
+            },
+          },
+          yAxis: {
+            type: "value",
+            name: "Price ($)",
+            nameTextStyle: {
+              color: "#6c757d",
+            },
+            axisLabel: {
+              formatter: "${value}",
+              color: "#6c757d",
+            },
+          },
+          series: [],
+          dataZoom: [
+            {
+              type: "inside",
+              start: 0,
+              end: 100,
+            },
+            {
+              start: 0,
+              end: 100,
+              height: 30,
+            },
+          ],
+        };
+
+        chart.setOption(option);
+      }
+
+      // Populate item selector
+      function populateItemSelector() {
+        const select = document.getElementById("itemSelect");
+        select.innerHTML = '<option value="all">All Items (Average)</option>';
+
+        filteredItems.forEach((item) => {
+          const option = document.createElement("option");
+          option.value = item;
+          const count = itemCounts.get(item) || 0;
+          option.textContent = `${item} (${count})`;
+          select.appendChild(option);
+        });
+      }
+
+      // Filter items based on search
+      function filterItems() {
+        const searchTerm = document
+          .getElementById("searchBox")
+          .value.toLowerCase();
+        filteredItems = allItems.filter((item) =>
+          item.toLowerCase().includes(searchTerm)
+        );
+        populateItemSelector();
+      }
+
+      // Select all items
+      function selectAll() {
+        const select = document.getElementById("itemSelect");
+        for (let option of select.options) {
+          option.selected = true;
+        }
+        updateVisualization();
+      }
+
+      // Clear selection
+      function clearSelection() {
+        const select = document.getElementById("itemSelect");
+        for (let option of select.options) {
+          option.selected = false;
+        }
+        select.options[0].selected = true; // Select "All Items" by default
+        updateVisualization();
+      }
+
+      // Update visualization based on selection
+      function updateVisualization() {
+        const select = document.getElementById("itemSelect");
+        const selectedItems = Array.from(select.selectedOptions).map(
+          (option) => option.value
+        );
+
+        if (selectedItems.length === 0) {
+          selectedItems.push("all");
+          select.options[0].selected = true;
+        }
+
+        updateChart(selectedItems);
+        updateTable(selectedItems);
+        updateStats(selectedItems);
+      }
+
+      // Update chart
+      function updateChart(selectedItems) {
+        const series = [];
+        const allDates = new Set();
+
+        if (selectedItems.includes("all")) {
+          // Calculate average price for all items by date
+          const dateMap = new Map();
+
+          rawData.forEach((item) => {
+            const date = item.transaction_date;
+            if (!dateMap.has(date)) {
+              dateMap.set(date, []);
+            }
+            dateMap.get(date).push(item.item_unit_price);
+            allDates.add(date);
+          });
+
+          const avgData = [];
+          const sortedDates = Array.from(allDates).sort();
+
+          sortedDates.forEach((date) => {
+            const prices = dateMap.get(date);
+            const avgPrice =
+              prices.reduce((sum, price) => sum + price, 0) / prices.length;
+            avgData.push(avgPrice);
+          });
+
+          series.push({
+            name: "Average Price (All Items)",
+            type: "line",
+            data: avgData,
+            smooth: true,
+            lineStyle: {
+              width: 2,
+              color: "#3b82f6",
+            },
+            itemStyle: {
+              color: "#3b82f6",
+            },
+          });
+        } else if (selectedItems.length === 1) {
+          // Single item - show as individual series
+          const itemName = selectedItems[0];
+          const itemData = rawData.filter((item) => {
+            const name =
+              item.combined_description || item.description || "Unknown Item";
+            return name === itemName;
+          });
+
+          const dateMap = new Map();
+          itemData.forEach((item) => {
+            const date = item.transaction_date;
+            if (!dateMap.has(date)) {
+              dateMap.set(date, []);
+            }
+            dateMap.get(date).push(item.item_unit_price);
+            allDates.add(date);
+          });
+
+          const avgData = [];
+          const sortedDates = Array.from(allDates).sort();
+
+          sortedDates.forEach((date) => {
+            if (dateMap.has(date)) {
+              const prices = dateMap.get(date);
+              const avgPrice =
+                prices.reduce((sum, price) => sum + price, 0) / prices.length;
+              avgData.push(avgPrice);
+            } else {
+              avgData.push(null);
+            }
+          });
+
+          series.push({
+            name:
+              itemName.length > 30
+                ? itemName.substring(0, 30) + "..."
+                : itemName,
+            type: "line",
+            data: avgData,
+            smooth: true,
+            connectNulls: true,
+            showSymbol: false,
+            lineStyle: {
+              width: 2,
+              color: "#3b82f6",
+            },
+            itemStyle: {
+              color: "#3b82f6",
+            },
+          });
+        } else if (selectedItems.length < 10) {
+          // Multiple items (< 10) - show as separate series for comparison
+          const colors = [
+            "#3b82f6",
+            "#ef4444",
+            "#10b981",
+            "#f59e0b",
+            "#8b5cf6",
+            "#06b6d4",
+            "#84cc16",
+            "#f97316",
+            "#ec4899",
+            "#14b8a6",
+          ];
+
+          // First, collect all dates from all selected items
+          selectedItems.forEach((itemName) => {
+            if (itemName === "all") return;
+
+            const itemData = rawData.filter((item) => {
+              const name =
+                item.combined_description || item.description || "Unknown Item";
+              return name === itemName;
+            });
+
+            itemData.forEach((item) => {
+              allDates.add(item.transaction_date);
+            });
+          });
+
+          const sortedDates = Array.from(allDates).sort();
+
+          // Create series for each selected item
+          selectedItems.forEach((itemName, index) => {
+            if (itemName === "all") return;
+
+            const itemData = rawData.filter((item) => {
+              const name =
+                item.combined_description || item.description || "Unknown Item";
+              return name === itemName;
+            });
+
+            const dateMap = new Map();
+            itemData.forEach((item) => {
+              const date = item.transaction_date;
+              if (!dateMap.has(date)) {
+                dateMap.set(date, []);
+              }
+              dateMap.get(date).push(item.item_unit_price);
+            });
+
+            const avgData = [];
+            sortedDates.forEach((date) => {
+              if (dateMap.has(date)) {
+                const prices = dateMap.get(date);
+                const avgPrice =
+                  prices.reduce((sum, price) => sum + price, 0) / prices.length;
+                avgData.push(avgPrice);
+              } else {
+                avgData.push(null);
+              }
+            });
+
+            const color = colors[index % colors.length];
+            series.push({
+              name:
+                itemName.length > 25
+                  ? itemName.substring(0, 25) + "..."
+                  : itemName,
+              type: "line",
+              data: avgData,
+              smooth: true,
+              connectNulls: true,
+              showSymbol: false,
+              lineStyle: {
+                width: 2,
+                color: color,
+              },
+              itemStyle: {
+                color: color,
+              },
+            });
+          });
+        } else {
+          // Many items (>= 10) - show as combined average
+          const dateMap = new Map();
+
+          selectedItems.forEach((itemName) => {
+            if (itemName === "all") return;
+
+            const itemData = rawData.filter((item) => {
+              const name =
+                item.combined_description || item.description || "Unknown Item";
+              return name === itemName;
+            });
+
+            itemData.forEach((item) => {
+              const date = item.transaction_date;
+              if (!dateMap.has(date)) {
+                dateMap.set(date, []);
+              }
+              dateMap.get(date).push(item.item_unit_price);
+              allDates.add(date);
+            });
+          });
+
+          const avgData = [];
+          const sortedDates = Array.from(allDates).sort();
+
+          sortedDates.forEach((date) => {
+            if (dateMap.has(date)) {
+              const prices = dateMap.get(date);
+              const avgPrice =
+                prices.reduce((sum, price) => sum + price, 0) / prices.length;
+              avgData.push(avgPrice);
+            } else {
+              avgData.push(null);
+            }
+          });
+
+          series.push({
+            name: `Average Price (${selectedItems.length} Selected Items)`,
+            type: "line",
+            data: avgData,
+            smooth: true,
+            connectNulls: true,
+            showSymbol: false,
+            lineStyle: {
+              width: 2,
+              color: "#3b82f6",
+            },
+            itemStyle: {
+              color: "#3b82f6",
+            },
+          });
+        }
+
+        const sortedDates = Array.from(allDates).sort();
+
+        // Completely clear and rebuild the chart to ensure no residual series remain
+        chart.clear();
+
+        const option = {
+          title: {
+            text: "Price Trends Over Time",
+            textStyle: {
+              fontSize: 18,
+              fontWeight: "500",
+              color: "#1a1a1a",
+            },
+          },
+          tooltip: {
+            trigger: "axis",
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+            borderColor: "#e1e5e9",
+            borderWidth: 1,
+            textStyle: {
+              color: "#333",
+            },
+            formatter: function (params) {
+              let tooltip = `<strong>${params[0].axisValue}</strong><br/>`;
+              params.forEach((param) => {
+                tooltip += `${param.marker} ${
+                  param.seriesName
+                }: $${param.value.toFixed(2)}<br/>`;
+              });
+              return tooltip;
+            },
+          },
+          legend: {
+            data: series.map((s) => s.name),
+            top: 40,
+            textStyle: {
+              color: "#1a1a1a",
+            },
+          },
+          grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            top: "15%",
+            containLabel: true,
+          },
+          toolbox: {
+            feature: {
+              saveAsImage: {
+                title: "Save as Image",
+              },
+              dataZoom: {
+                title: {
+                  zoom: "Zoom",
+                  back: "Reset Zoom",
+                },
+              },
+            },
+          },
+          xAxis: {
+            type: "category",
+            boundaryGap: false,
+            data: sortedDates,
+            axisLabel: {
+              rotate: 45,
+              color: "#6c757d",
+            },
+          },
+          yAxis: {
+            type: "value",
+            name: "Price ($)",
+            nameTextStyle: {
+              color: "#6c757d",
+            },
+            axisLabel: {
+              formatter: "${value}",
+              color: "#6c757d",
+            },
+          },
+          series: series,
+          dataZoom: [
+            {
+              type: "inside",
+              start: 0,
+              end: 100,
+            },
+            {
+              start: 0,
+              end: 100,
+              height: 30,
+            },
+          ],
+        };
+
+        chart.setOption(option);
+      }
+
+      // Update table
+      function updateTable(selectedItems) {
+        const tbody = document.getElementById("tableBody");
+        let filteredData = [];
+
+        if (selectedItems.includes("all")) {
+          filteredData = rawData.slice(0, 100); // Limit to first 100 for performance
+        } else {
+          filteredData = rawData
+            .filter((item) => {
+              const name =
+                item.combined_description || item.description || "Unknown Item";
+              return selectedItems.includes(name);
+            })
+            .slice(0, 100);
+        }
+
+        // Sort by date (newest first)
+        filteredData.sort(
+          (a, b) => new Date(b.transaction_date) - new Date(a.transaction_date)
+        );
+
+        tbody.innerHTML = "";
+        filteredData.forEach((item) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+                    <td>${item.transaction_date}</td>
+                    <td>${
+                      item.combined_description ||
+                      item.description ||
+                      "Unknown Item"
+                    }</td>
+                    <td>${item.description2 || "-"}</td>
+                    <td>$${item.item_unit_price.toFixed(2)}</td>
+                `;
+          tbody.appendChild(row);
+        });
+
+        if (filteredData.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="4">No data available for selected items</td></tr>';
+        }
+      }
+
+      // Update statistics
+      function updateStats(selectedItems) {
+        const statsContainer = document.getElementById("statsContainer");
+
+        if (selectedItems.includes("all")) {
+          const prices = rawData.map((item) => item.item_unit_price);
+          const stats = calculateStats(prices, "All Items");
+          statsContainer.innerHTML = renderStats([stats]);
+        } else {
+          const statsArray = [];
+
+          selectedItems.forEach((itemName) => {
+            if (itemName === "all") return;
+
+            const itemData = rawData.filter((item) => {
+              const name =
+                item.combined_description || item.description || "Unknown Item";
+              return name === itemName;
+            });
+
+            if (itemData.length > 0) {
+              const prices = itemData.map((item) => item.item_unit_price);
+              const stats = calculateStats(prices, itemName);
+              statsArray.push(stats);
+            }
+          });
+
+          statsContainer.innerHTML = renderStats(statsArray);
+        }
+      }
+
+      // Calculate statistics
+      function calculateStats(prices, itemName) {
+        if (prices.length === 0) return null;
+
+        const sorted = [...prices].sort((a, b) => a - b);
+        const sum = prices.reduce((a, b) => a + b, 0);
+        const mean = sum / prices.length;
+        const variance =
+          prices.reduce((acc, price) => acc + Math.pow(price - mean, 2), 0) /
+          prices.length;
+        const stdDev = Math.sqrt(variance);
+
+        return {
+          name: itemName,
+          count: prices.length,
+          min: Math.min(...prices),
+          max: Math.max(...prices),
+          avg: mean,
+          stdDev: stdDev,
+          median: sorted[Math.floor(sorted.length / 2)],
+        };
+      }
+
+      // Render statistics
+      function renderStats(statsArray) {
+        if (!statsArray || statsArray.length === 0) {
+          return '<div class="loading">No statistics available</div>';
+        }
+
+        return statsArray
+          .map((stats) => {
+            if (!stats) return "";
+
+            const displayName =
+              stats.name.length > 25
+                ? stats.name.substring(0, 25) + "..."
+                : stats.name;
+
+            return `
+                    <div class="stat-item">
+                        <h4>${displayName}</h4>
+                        <div class="stat-value">Count: ${stats.count}</div>
+                        <div class="stat-value">Min: $${stats.min.toFixed(
+                          2
+                        )}</div>
+                        <div class="stat-value">Max: $${stats.max.toFixed(
+                          2
+                        )}</div>
+                        <div class="stat-value">Avg: $${stats.avg.toFixed(
+                          2
+                        )}</div>
+                        <div class="stat-value">Median: $${stats.median.toFixed(
+                          2
+                        )}</div>
+                        <div class="stat-value">Std Dev: $${stats.stdDev.toFixed(
+                          2
+                        )}</div>
+                    </div>
+                `;
+          })
+          .join("");
+      }
+
+      // Calculate and update price changes
+      function updatePriceChanges() {
+        const priceChanges = calculatePriceChanges();
+        const container = document.getElementById("priceChangesContainer");
+
+        if (priceChanges.length === 0) {
+          container.innerHTML =
+            '<div class="loading">No price change data available</div>';
+          return;
+        }
+
+        const html = priceChanges
+          .slice(0, 10) // Top 10
+          .map((item) => {
+            const isPositive = item.percentChange >= 0;
+            const displayName =
+              item.name.length > 30
+                ? item.name.substring(0, 30) + "..."
+                : item.name;
+
+            return `
+              <div class="price-change-item ${
+                isPositive ? "positive" : "negative"
+              }" onclick="selectItemInMultiSelect('${item.name.replace(
+              /'/g,
+              "\\'"
+            )}')">
+                <div class="price-change-name">${displayName}</div>
+                <div class="price-change-details">
+                  <div class="price-change-percent ${
+                    isPositive ? "positive" : "negative"
+                  }">
+                    ${isPositive ? "+" : ""}${item.percentChange.toFixed(1)}%
+                  </div>
+                  <div class="price-change-prices">
+                    $${item.earliestPrice.toFixed(
+                      2
+                    )} → $${item.latestPrice.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        container.innerHTML = html;
+      }
+
+      // Calculate price changes for all items
+      function calculatePriceChanges() {
+        const itemPriceData = new Map();
+
+        // Group data by item and collect all price points with dates
+        rawData.forEach((item) => {
+          const itemName =
+            item.combined_description || item.description || "Unknown Item";
+          if (!itemPriceData.has(itemName)) {
+            itemPriceData.set(itemName, []);
+          }
+          itemPriceData.get(itemName).push({
+            date: new Date(item.transaction_date),
+            price: item.item_unit_price,
+          });
+        });
+
+        const priceChanges = [];
+
+        // Calculate price changes for each item
+        itemPriceData.forEach((pricePoints, itemName) => {
+          if (pricePoints.length < 2) return; // Need at least 2 data points
+
+          // Sort by date
+          pricePoints.sort((a, b) => a.date - b.date);
+
+          const earliestPrice = pricePoints[0].price;
+          const latestPrice = pricePoints[pricePoints.length - 1].price;
+
+          // Calculate percentage change
+          const percentChange =
+            ((latestPrice - earliestPrice) / earliestPrice) * 100;
+
+          // Only include items with significant price changes (> 1% absolute change)
+          if (Math.abs(percentChange) > 1) {
+            priceChanges.push({
+              name: itemName,
+              earliestPrice,
+              latestPrice,
+              percentChange,
+              dataPoints: pricePoints.length,
+              earliestDate: pricePoints[0].date,
+              latestDate: pricePoints[pricePoints.length - 1].date,
+            });
+          }
+        });
+
+        // Sort by absolute percentage change (descending)
+        priceChanges.sort(
+          (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
+        );
+
+        return priceChanges;
+      }
+
+      // Select item in multi-select and update visualization
+      function selectItemInMultiSelect(itemName) {
+        const select = document.getElementById("itemSelect");
+
+        // Clear current selection
+        for (let option of select.options) {
+          option.selected = false;
+        }
+
+        // Find and select the clicked item
+        for (let option of select.options) {
+          if (option.value === itemName) {
+            option.selected = true;
+            break;
+          }
+        }
+
+        // Update the visualization
+        updateVisualization();
+      }
+
+      // Event listeners
+      document
+        .getElementById("itemSelect")
+        .addEventListener("change", updateVisualization);
+
+      // Resize chart when window resizes
+      window.addEventListener("resize", function () {
+        if (chart) {
+          chart.resize();
+        }
+      });
+
+      // Initialize the app when page loads
+      document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+  </body>
+</html>
