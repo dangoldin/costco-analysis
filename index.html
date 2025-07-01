@@ -359,7 +359,7 @@
         </div>
 
         <div class="stats-section">
-          <h3>Largest Price Changes</h3>
+          <h3>Largest Annualized Price Changes</h3>
           <div id="priceChangesContainer">
             <div class="loading">Loading price change analysis...</div>
           </div>
@@ -1175,11 +1175,20 @@
         const html = priceChanges
           .slice(0, 10) // Top 10
           .map((item) => {
-            const isPositive = item.percentChange >= 0;
+            const isPositive = item.annualizedChange >= 0;
             const displayName =
               item.name.length > 30
                 ? item.name.substring(0, 30) + "..."
                 : item.name;
+
+            // Format time period for display
+            let timePeriodText;
+            if (item.timeDiffYears >= 1) {
+              timePeriodText = `${item.timeDiffYears.toFixed(1)} years`;
+            } else {
+              const months = item.timeDiffYears * 12;
+              timePeriodText = `${months.toFixed(1)} months`;
+            }
 
             return `
               <div class="price-change-item ${
@@ -1193,12 +1202,14 @@
                   <div class="price-change-percent ${
                     isPositive ? "positive" : "negative"
                   }">
-                    ${isPositive ? "+" : ""}${item.percentChange.toFixed(1)}%
+                    ${isPositive ? "+" : ""}${item.annualizedChange.toFixed(
+              1
+            )}% annually
                   </div>
                   <div class="price-change-prices">
                     $${item.earliestPrice.toFixed(
                       2
-                    )} → $${item.latestPrice.toFixed(2)}
+                    )} → $${item.latestPrice.toFixed(2)} (${timePeriodText})
                   </div>
                 </div>
               </div>
@@ -1237,28 +1248,45 @@
 
           const earliestPrice = pricePoints[0].price;
           const latestPrice = pricePoints[pricePoints.length - 1].price;
+          const earliestDate = pricePoints[0].date;
+          const latestDate = pricePoints[pricePoints.length - 1].date;
 
-          // Calculate percentage change
-          const percentChange =
+          // Calculate time difference in years
+          const timeDiffMs = latestDate - earliestDate;
+          const timeDiffYears = timeDiffMs / (1000 * 60 * 60 * 24 * 365.25);
+
+          // Skip items with very short time periods (less than 30 days)
+          if (timeDiffYears < 30 / 365.25) return;
+
+          // Calculate total percentage change
+          const totalPercentChange =
             ((latestPrice - earliestPrice) / earliestPrice) * 100;
 
-          // Only include items with significant price changes (> 1% absolute change)
-          if (Math.abs(percentChange) > 1) {
+          // Calculate annualized rate of change using compound annual growth rate (CAGR)
+          // CAGR = (Ending Value / Beginning Value)^(1/years) - 1
+          const annualizedChange =
+            (Math.pow(latestPrice / earliestPrice, 1 / timeDiffYears) - 1) *
+            100;
+
+          // Only include items with significant annualized changes (> 1% absolute change per year)
+          if (Math.abs(annualizedChange) > 1) {
             priceChanges.push({
               name: itemName,
               earliestPrice,
               latestPrice,
-              percentChange,
+              percentChange: totalPercentChange,
+              annualizedChange,
+              timeDiffYears,
               dataPoints: pricePoints.length,
-              earliestDate: pricePoints[0].date,
-              latestDate: pricePoints[pricePoints.length - 1].date,
+              earliestDate,
+              latestDate,
             });
           }
         });
 
-        // Sort by absolute percentage change (descending)
+        // Sort by absolute annualized percentage change (descending)
         priceChanges.sort(
-          (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
+          (a, b) => Math.abs(b.annualizedChange) - Math.abs(a.annualizedChange)
         );
 
         return priceChanges;
