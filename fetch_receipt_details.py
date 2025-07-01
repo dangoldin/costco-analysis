@@ -1,191 +1,211 @@
-#!/usr/bin/env python3
-"""
-Script to fetch detailed receipt information for all transaction barcodes
-found in the Costco data files.
-
-This script:
-1. Reads all JSON files in the data/ directory
-2. Extracts all transactionBarcode values from the receipts
-3. Uses fetch_receipt.py to download detailed receipt information for each barcode
-4. Saves detailed receipts to data/receipts/ directory
-"""
-
-import importlib.util
 import json
 import os
-import time
-from pathlib import Path
-from typing import List, Set
+from datetime import datetime
 
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Import the fetch_receipt function
-spec = importlib.util.spec_from_file_location(
-    "fetch_receipt", "fetch_receipt.py")
-if spec is None or spec.loader is None:
-    raise ImportError("Could not load fetch_receipt.py module")
-fetch_receipt_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fetch_receipt_module)
 
+def fetch_costco_receipt(barcode, output_dir="data/receipts"):
+    """Fetch a single Costco receipt by barcode"""
 
-def get_transaction_barcodes_from_file(filepath: str) -> Set[str]:
-    """Extract all transactionBarcode values from a single data file."""
-    barcodes = set()
-
-    try:
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-
-        # Navigate to the receipts array
-        receipts = data.get('data', {}).get(
-            'receiptsWithCounts', {}).get('receipts', [])
-
-        for receipt in receipts:
-            barcode = receipt.get('transactionBarcode')
-            if barcode:
-                barcodes.add(barcode)
-
-        print(f"Found {len(barcodes)} unique barcodes in {filepath}")
-
-    except (json.JSONDecodeError, FileNotFoundError) as e:
-        print(f"Error reading {filepath}: {e}")
-
-    return barcodes
-
-
-def get_all_transaction_barcodes(data_dir: str = "data") -> Set[str]:
-    """Extract all unique transactionBarcode values from all data files."""
-    all_barcodes = set()
-    data_path = Path(data_dir)
-
-    # Find all JSON files that match the pattern (excluding receipt detail files)
-    json_files = [
-        f for f in data_path.glob("*.json")
-        if f.name.startswith("costco_data_") and not f.name.startswith("costco_data_receipt_")
-    ]
-
-    print(f"Processing {len(json_files)} data files...")
-
-    for json_file in sorted(json_files):
-        print(f"Processing: {json_file.name}")
-        barcodes = get_transaction_barcodes_from_file(str(json_file))
-        all_barcodes.update(barcodes)
-
-    return all_barcodes
-
-
-def get_existing_receipt_barcodes(receipts_dir: str = "data/receipts") -> Set[str]:
-    """Get barcodes for receipts that have already been downloaded."""
-    existing_barcodes = set()
-    receipts_path = Path(receipts_dir)
-
-    if not receipts_path.exists():
-        return existing_barcodes
-
-    # Look for files matching the pattern costco_data_receipt_*.json
-    receipt_files = receipts_path.glob("costco_data_receipt_*.json")
-
-    for receipt_file in receipt_files:
-        # Extract barcode from filename: costco_data_receipt_{barcode}.json
-        filename = receipt_file.name
-        if filename.startswith("costco_data_receipt_") and filename.endswith(".json"):
-            barcode = filename[len("costco_data_receipt_"):-len(".json")]
-            existing_barcodes.add(barcode)
-
-    return existing_barcodes
-
-
-def fetch_receipt_details(
-    barcodes: Set[str],
-    output_dir: str = "data/receipts",
-    delay_seconds: float = 1.0,
-    skip_existing: bool = True
-) -> None:
-    """Fetch detailed receipt information for all provided barcodes."""
-
-    # Check if bearer token is available
+    # Get bearer token from environment
     bearer_token = os.getenv('COSTCO_BEARER_TOKEN')
     if not bearer_token:
         raise ValueError(
             "COSTCO_BEARER_TOKEN environment variable is required. Please set it in your .env file.")
 
-    if skip_existing:
-        existing_barcodes = get_existing_receipt_barcodes(output_dir)
-        barcodes_to_fetch = barcodes - existing_barcodes
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
 
-        if existing_barcodes:
-            print(
-                f"Skipping {len(existing_barcodes)} receipts that already exist")
+    url = "https://ecom-api.costco.com/ebusiness/order/v1/orders/graphql"
 
-        if not barcodes_to_fetch:
-            print("All receipts have already been downloaded!")
-            return
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'costco.service': 'restOrders',
+        'costco.env': 'ecom',
+        'costco-x-authorization': f'Bearer {bearer_token}',
+        'Content-Type': 'application/json-patch+json',
+        'costco-x-wcs-clientId': os.getenv('COSTCO_CLIENT_ID'),
+        'client-identifier': os.getenv('COSTCO_CLIENT_IDENTIFIER'),
+        'Origin': 'https://www.costco.com',
+        'DNT': '1',
+        'Sec-GPC': '1',
+        'Connection': 'keep-alive',
+        'Referer': 'https://www.costco.com/',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
+        'Priority': 'u=0'
+    }
 
-        barcodes = barcodes_to_fetch
+    query = """query receiptsWithCounts($barcode: String!,$documentType:String!) {
+    receiptsWithCounts(barcode: $barcode,documentType:$documentType) {
+receipts{
+      warehouseName
+      receiptType
+      documentType
+      transactionDateTime
+      transactionDate
+      companyNumber
+      warehouseNumber
+      operatorNumber
+      warehouseName
+      warehouseShortName
+      registerNumber
+      transactionNumber
+      transactionType
+      transactionBarcode
+      total
+      warehouseAddress1
+      warehouseAddress2
+      warehouseCity
+      warehouseState
+      warehouseCountry
+      warehousePostalCode
+      totalItemCount
+      subTotal
+      taxes
+      total
+      invoiceNumber
+      sequenceNumber
+      itemArray {
+        itemNumber
+        itemDescription01
+        frenchItemDescription1
+        itemDescription02
+        frenchItemDescription2
+        itemIdentifier
+        itemDepartmentNumber
+        unit
+        amount
+        taxFlag
+        merchantID
+        entryMethod
+        transDepartmentNumber
+        fuelUnitQuantity
+        fuelGradeCode
+        fuelUnitQuantity
+        itemUnitPriceAmount
+        fuelUomCode
+        fuelUomDescription
+        fuelUomDescriptionFr
+        fuelGradeDescription
+        fuelGradeDescriptionFr
 
-    print(
-        f"Fetching detailed receipt information for {len(barcodes)} barcodes...")
+      }
+      tenderArray {
+        tenderTypeCode
+        tenderSubTypeCode
+        tenderDescription
+        amountTender
+        displayAccountNumber
+        sequenceNumber
+        approvalNumber
+        responseCode
+        tenderTypeName
+         transactionID
+         merchantID
+         entryMethod
+         tenderAcctTxnNumber
+         tenderAuthorizationCode
+         tenderTypeName
+         tenderTypeNameFr
+         tenderEntryMethodDescription
+         walletType
+         walletId
+         storedValueBucket
+      }
+        subTaxes {
+          tax1
+          tax2
+          tax3
+          tax4
+          aTaxPercent
+          aTaxLegend
+          aTaxAmount
+          aTaxPrintCode
+          aTaxPrintCodeFR
+          aTaxIdentifierCode
+          bTaxPercent
+          bTaxLegend
+          bTaxAmount
+          bTaxPrintCode
+          bTaxPrintCodeFR
+          bTaxIdentifierCode
+          cTaxPercent
+          cTaxLegend
+          cTaxAmount
+          cTaxIdentifierCode
+          dTaxPercent
+          dTaxLegend
+          dTaxAmount
+          dTaxPrintCode
+          dTaxPrintCodeFR
+          dTaxIdentifierCode
+          uTaxLegend
+          uTaxAmount
+          uTaxableAmount
+        }
+        instantSavings
+        membershipNumber
+    }
+  }
+ }"""
 
-    successful_downloads = 0
-    failed_downloads = 0
+    payload = {
+        "query": query,
+        "variables": {
+            "barcode": barcode,
+            "documentType": "warehouse"
+        }
+    }
 
-    for i, barcode in enumerate(sorted(barcodes), 1):
-        print(f"\n[{i}/{len(barcodes)}] Processing barcode: {barcode}")
+    try:
+        print(f"Fetching receipt for barcode: {barcode}")
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
 
-        try:
-            success = fetch_receipt_module.fetch_costco_receipt(
-                barcode, output_dir)
+        # Generate filename based on barcode
+        filename = f"costco_data_receipt_{barcode}.json"
+        filepath = os.path.join(output_dir, filename)
 
-            if success:
-                successful_downloads += 1
-                print(f"✅ Successfully downloaded receipt {barcode}")
-            else:
-                failed_downloads += 1
-                print(f"❌ Failed to download receipt {barcode}")
+        # Save the response data
+        with open(filepath, 'w') as f:
+            json.dump(response.json(), f, indent=2)
 
-            # Add delay between requests to be respectful to the API
-            if i < len(barcodes):  # Don't delay after the last request
-                print(
-                    f"Waiting {delay_seconds} seconds before next request...")
-                time.sleep(delay_seconds)
+        print(f"Receipt data saved to {filepath}")
+        return True
 
-        except KeyboardInterrupt:
-            print(f"\n⚠️  Process interrupted by user after {i-1} receipts")
-            break
-        except Exception as e:
-            failed_downloads += 1
-            print(f"❌ Unexpected error processing barcode {barcode}: {e}")
-
-    print(f"\n📊 Summary:")
-    print(f"   • Successful downloads: {successful_downloads}")
-    print(f"   • Failed downloads: {failed_downloads}")
-    print(f"   • Total processed: {successful_downloads + failed_downloads}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching receipt for barcode {barcode}: {e}")
+        return False
 
 
 def main():
-    """Main function to orchestrate the receipt fetching process."""
-    print("🔍 Costco Receipt Details Fetcher")
-    print("=" * 50)
+    """Example usage - fetch a receipt by barcode"""
+    # Example barcode from the curl command
+    test_barcode = "21133401100522303241037"
 
-    # Step 1: Extract all transaction barcodes
-    print("\n📂 Step 1: Extracting transaction barcodes from data files...")
-    all_barcodes = get_all_transaction_barcodes()
+    print(f"Fetching receipt for barcode: {test_barcode}")
+    success = fetch_costco_receipt(test_barcode)
 
-    if not all_barcodes:
-        print("❌ No transaction barcodes found in data files!")
-        return
-
-    print(f"✅ Found {len(all_barcodes)} unique transaction barcodes")
-
-    # Step 2: Fetch detailed receipt information
-    print(f"\n📥 Step 2: Fetching detailed receipt information...")
-    fetch_receipt_details(all_barcodes)
-
-    print(f"\n🎉 Process completed!")
+    if success:
+        print("✅ Receipt fetched successfully!")
+    else:
+        print("❌ Failed to fetch receipt.")
 
 
 if __name__ == "__main__":
+    # You can either run main() for the example, or call fetch_costco_receipt() directly
+    # with your own barcode
     main()
+
+    # Or use it like this:
+    # fetch_costco_receipt("your_barcode_here")

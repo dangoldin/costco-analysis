@@ -1,6 +1,6 @@
 # Costco Analysis
 
-This project contains scripts to fetch and analyze Costco receipt data using the Costco API.
+This project contains scripts to fetch and analyze Costco receipt data using the Costco API. Note that you need to log in to costco.com manually and look at the network requests to get the bearer token, the client ID, and the client identifier.
 
 ## Setup
 
@@ -24,9 +24,9 @@ This project contains scripts to fetch and analyze Costco receipt data using the
 
 ## Scripts
 
-- `fetch_receipt_list.py` - Fetches receipt lists for date ranges
-- `fetch_receipt.py` - Fetches detailed receipt information by barcode
-- `fetch_receipt_details.py` - Batch fetches detailed receipts for all barcodes found in data files
+- `fetch_receipts.py` - Fetches receipt lists for date ranges
+- `fetch_receipt_details.py` - Fetches detailed receipt information by barcode
+- `fetch_all_receipt_details.py` - Batch fetches detailed receipts for all barcodes found in data files
 
 ## Environment Variables
 
@@ -39,16 +39,19 @@ This project contains scripts to fetch and analyze Costco receipt data using the
 All scripts will automatically load the required credentials from your `.env` file. Make sure to set up all the environment variables before running any scripts.
 
 ```bash
-python fetch_receipt_list.py
-python fetch_receipt.py
-python fetch_receipt_details.py
+python fetch_receipts.py
+python fetch_all_receipt_details.py
 ```
 
 ## CSV Export
 
-TODO: Add script for this.
+Use the `generate_csv_file.py` script to export all receipt data to CSV:
 
-In the meantime, you can export the data to CSV using the following DuckDB query and save as `costco_data.csv`:
+```bash
+python generate_csv_file.py
+```
+
+This script uses the following DuckDB query to process the JSON data and save as `costco-items.csv`:
 
 ```sql
 WITH receipts AS (
@@ -59,6 +62,7 @@ WITH receipts AS (
 SELECT
     r ->> 'transactionDate'      AS transaction_date,
     r ->> 'transactionBarcode'   AS transaction_barcode,
+    r ->> 'warehouseName'        AS warehouse_name,
     item ->> 'itemNumber'        AS item_number,
     item ->> 'itemDescription01' AS description,
     item ->> 'itemDescription02' AS description2,
